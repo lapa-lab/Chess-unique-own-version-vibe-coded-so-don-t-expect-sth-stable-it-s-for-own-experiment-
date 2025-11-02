@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шахматы (Пользовательский вариант)</title>
+    
+    <!-- --- НОВЫЕ СТРОКИ PWA --- -->
+    
+    <!-- 1. Подключаем Манифест -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- 2. Цвет темы для Safari на iOS и др. -->
+    <meta name="theme-color" content="#5a4a3a">
+    
+    <!-- 3. Иконка для Apple -->
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/B58863/FFFFFF?text=♚">
+    
+    <!-- 4. Регистрируем Service Worker -->
+    <script>
+      // Убедимся, что Service Worker поддерживается
+      if ('serviceWorker' in navigator) {
+        // Регистрируем его после загрузки страницы
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then(registration => {
+              console.log('Service Worker зарегистрирован успешно:', registration.scope);
+            })
+            .catch(error => {
+              console.log('Ошибка регистрации Service Worker:', error);
+            });
+        });
+      }
+    </script>
+    <!-- --- КОНЕЦ НОВЫХ СТРОК --- -->
+
+
+    <style>
+        /* (Весь CSS код остается без изменений) */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #312e2b; /* Темный фон */
+            color: #f0f0f0;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        h1 {
+            font-size: clamp(2rem, 5vw, 2.5rem);
+            margin: 0;
+            color: #e0e0e0;
+        }
+        #status-message {
+            font-size: clamp(1.2rem, 4vw, 1.5rem);
+            font-weight: bold;
+            height: 2rem;
+            color: #fff;
+        }
+        #chessboard {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 640px;
+            max-height: 640px;
+            border: 6px solid #5a4a3a;
+            border-radius: 8px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+        }
+        .square {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(28px, 9vmin, 60px); 
+            user-select: none;
+            cursor: pointer;
+            transition: background-color 0.1s ease-in-out;
+            box-sizing: border-box;
+            position: relative; /* Для визуализации стен */
+        }
+        .square.light { background-color: #f0d9b5; }
+        .square.dark { background-color: #b58863; }
+        
+        .square.wall-w::after, .square.wall-b::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            opacity: 0.4;
+            pointer-events: none; /* Не мешает кликам */
+        }
+        .square.wall-w::after {
+            background-color: #FFD700; /* Золотой (Белая стена) */
+        }
+        .square.wall-b::after {
+            background-color: #4682B4; /* Стальной синий (Черная стена) */
+        }
+
+        .square.selected {
+            background-color: rgba(46, 204, 113, 0.7) !important;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        .square.valid-move {
+            background-color: rgba(135, 206, 250, 0.6) !important;
+        }
+        .square.valid-move:hover {
+            background-color: rgba(135, 206, 250, 0.8) !important;
+        }
+        #reset-button {
+            padding: 12px 25px;
+            font-size: clamp(1rem, 3.5vw, 1.2rem);
+            font-weight: bold;
+            color: #312e2b;
+            background: linear-gradient(145deg, #e0dcd7, #ffffff);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2), 
+                        inset 2px 2px 5px rgba(255, 255, 255, 0.7),
+                        inset -2px -2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+        #reset-button:hover {
+            background: linear-gradient(145deg, #ffffff, #e0dcd7);
+            box-shadow: 0 7px 18px rgba(0, 0, 0, 0.3), 
+                        inset 2px 2px 5px rgba(255, 255, 255, 0.7),
+                        inset -2px -2px 5px rgba(0, 0, 0, 0.1);
+        }
+        #reset-button:active {
+            transform: translateY(1px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3), 
+                        inset 2px 2px 10px rgba(0, 0, 0, 0.2),
+                        inset -2px -2px 5px rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>Шахматы (Свой Вариант)</h1>
+        <div id="status-message">Ход: Белые</div>
+        <div id="chessboard"></div>
+        <button id="reset-button">Начать заново</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 1. DOM Элементы ---
+            const chessboard = document.getElementById('chessboard');
+            const statusMessage = document.getElementById('status-message');
+            const resetButton = document.getElementById('reset-button');
+
+            // --- 2. Константы и Игровые данные ---
+            const PIECES = {
+                'wR': '♜', 'wN': '♞', 'wB': '♝', 'wQ': '♛', 'wK': '♚', 'wP': '♟',
+                'bR': '♜', 'bN': '♞', 'bB': '♝', 'bQ': '♛', 'bK': '♚', 'bP': '♟'
+            };
+
+            const WOOD_COLOR = '#C19A6B'; // Бежевый/деревянный
+            const PIECE_COLORS = {
+                'wR': WOOD_COLOR, 'wN': WOOD_COLOR, 'wB': WOOD_COLOR, 'wQ': WOOD_COLOR, 'wK': WOOD_COLOR, 'wP': WOOD_COLOR,
+                'bR': '#333', 'bN': '#333', 'bB': '#333', 'bQ': '#333', 'bK': '#333', 'bP': '#333'
+            };
+
+            const INITIAL_BOARD = [
+                ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
+                ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
+                [null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null],
+                [null, null, null, null, null, null, null, null],
+                ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
+                ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+            ];
+
+            // --- 3. Игровое состояние (State) ---
+            let boardState = [];
+            let currentPlayer = 'w';
+            let selectedPiece = null;
+            let validMoves = [];
+            let isThinking = false;
+
+            // --- 3.5. Константы для ИИ ---
+            const AI_DEPTH = 2; 
+            const PIECE_VALUES = {
+                'P': 10, 'N': 30, 'B': 30, 'R': 50, 'Q': 90, 'K': 900
+            };
+            
+            // --- 4. Основные функции ---
+            
+            function initializeApp() {
+                boardState = JSON.parse(JSON.stringify(INITIAL_BOARD));
+                currentPlayer = 'w';
+                selectedPiece = null;
+                validMoves = [];
+                isThinking = false;
+                createBoard();
+                renderBoard();
+                updateStatus('Ход: Белые');
+            }
+
+            function createBoard() {
+                chessboard.innerHTML = '';
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const square = document.createElement('div');
+                        square.classList.add('square');
+                        square.classList.add((r + c) % 2 === 0 ? 'light' : 'dark');
+                        square.dataset.row = r;
+                        square.dataset.col = c;
+                        square.addEventListener('click', () => onSquareClick(r, c));
+                        chessboard.appendChild(square);
+                    }
+                }
+            }
+
+            function renderBoard() {
+                const whiteWalls = getWallSquares(boardState, 'w');
+                const blackWalls = getWallSquares(boardState, 'b');
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = boardState[r][c];
+                        const square = chessboard.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                        if (square) {
+                            
+                            square.innerHTML = piece ? PIECES[piece] : '&nbsp;';
+                            square.style.color = piece ? PIECE_COLORS[piece] : '';
+                            
+                            square.classList.remove('selected', 'valid-move', 'wall-w', 'wall-b');
+
+                            if (whiteWalls.has(`${r},${c}`)) {
+                                square.classList.add('wall-w');
+                            }
+                            if (blackWalls.has(`${r},${c}`)) {
+                                square.classList.add('wall-b');
+                            }
+                            
+                            if (selectedPiece && selectedPiece.fromRow === r && selectedPiece.fromCol === c) {
+                                square.classList.add('selected');
+                            }
+                            if (validMoves.some(move => move[0] === r && move[1] === c)) {
+                                square.classList.add('valid-move');
+                            }
+                        }
+                    }
+                }
+            }
+            
+            function onSquareClick(row, col) {
+                if (isThinking || currentPlayer === 'b') return;
+                const piece = boardState[row][col];
+
+                if (selectedPiece) {
+                    const isValidMove = validMoves.some(move => move[0] === row && move[1] === col);
+                    if (isValidMove) {
+                        movePiece(selectedPiece.fromRow, selectedPiece.fromCol, row, col);
+                        pawnPromotionCheck(row, col);
+                        switchPlayer();
+                        resetSelection();
+                        renderBoard();
+                        triggerAIMove();
+                    } else if (piece && piece[0] === currentPlayer) {
+                        selectPiece(piece, row, col);
+                    } else {
+                        resetSelection();
+                    }
+                } else if (piece && piece[0] === currentPlayer) {
+                    selectPiece(piece, row, col);
+                }
+                renderBoard();
+            }
+            
+            function selectPiece(piece, row, col) {
+                selectedPiece = { piece, fromRow: row, fromCol: col };
+                validMoves = getValidMoves(piece, row, col, boardState);
+            }
+
+            function resetSelection() {
+                selectedPiece = null;
+                validMoves = [];
+            }
+            
+            function switchPlayer() {
+                currentPlayer = currentPlayer === 'w' ? 'b' : 'w';
+                
+                let status = `Ход: ${currentPlayer === 'w' ? 'Белые' : 'Черные'}`;
+                if (isKingInCheck(boardState, currentPlayer)) {
+                    status += ' (Шах!)';
+                }
+                updateStatus(status);
+            }
+
+            function updateStatus(message) {
+                statusMessage.textContent = message;
+            }
+
+            function movePiece(fromRow, fromCol, toRow, toCol) {
+                const piece = boardState[fromRow][fromCol];
+                boardState[toRow][toCol] = piece;
+                boardState[fromRow][fromCol] = null;
+            }
+            
+            function pawnPromotionCheck(row, col) {
+                const piece = boardState[row][col];
+                if (!piece) return;
+                if (piece === 'wP' && row === 0) boardState[row][col] = 'wQ';
+                if (piece === 'bP' && row === 7) boardState[row][col] = 'bQ';
+            }
+
+            // --- 5. Логика валидации ходов ---
+
+            function isInBounds(r, c) {
+                return r >= 0 && r < 8 && c >= 0 && c < 8;
+            }
+
+            function getWallSquares(board, color) {
+                const wallSquares = new Set();
+                const rook = color + 'R';
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        if (board[r][c] !== rook) continue;
+
+                        let wallPath = [];
+                        for (let nc = c + 1; nc < 8; nc++) {
+                            const piece = board[r][nc];
+                            if (piece) {
+                                if (piece === rook) { 
+                                    wallPath.forEach(sq => wallSquares.add(sq));
+                                }
+                                break; 
+                            } else {
+                                wallPath.push(`${r},${nc}`); 
+                            }
+                        }
+
+                        wallPath = [];
+                        for (let nr = r + 1; nr < 8; nr++) {
+                            const piece = board[nr][c];
+                            if (piece) {
+                                if (piece === rook) { 
+                                    wallPath.forEach(sq => wallSquares.add(sq));
+                                }
+                                break; 
+                            } else {
+                                wallPath.push(`${nr},${c}`);
+                            }
+                        }
+                    }
+                }
+                return wallSquares;
+            }
+            
+            function isKingInCheck(board, kingColor) {
+                let kRow, kCol;
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        if (board[r][c] === kingColor + 'K') {
+                            kRow = r; kCol = c; break;
+                        }
+                    }
+                    if (kRow !== undefined) break;
+                }
+                if (kRow === undefined) return false; 
+
+                const opponentColor = kingColor === 'w' ? 'b' : 'w';
+                const ownWall = getWallSquares(board, kingColor); 
+
+                const knightMoves = [
+                    [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+                    [1, -2], [1, 2], [2, -1], [2, 1]
+                ];
+                for (const [dr, dc] of knightMoves) {
+                    const nr = kRow + dr;
+                    const nc = kCol + dc;
+                    if (isInBounds(nr, nc) && board[nr][nc] === opponentColor + 'N') {
+                        return true;
+                    }
+                }
+
+                const directions = [
+                    [-1, 0], [1, 0], [0, -1], [0, 1], 
+                    [-1, -1], [-1, 1], [1, -1], [1, 1] 
+                ];
+                for (const [dr, dc] of directions) {
+                    let nr = kRow + dr;
+                    let nc = kCol + dc;
+                    while (isInBounds(nr, nc)) {
+                        
+                        if (ownWall.has(`${nr},${nc}`)) {
+                            break;
+                        }
+
+                        const piece = board[nr][nc];
+                        if (piece) {
+                            if (piece[0] === opponentColor) {
+                                const pieceType = piece[1];
+                                if (Math.abs(dr) === Math.abs(dc)) { 
+                                    if (pieceType === 'B' || pieceType === 'Q') return true;
+                                } 
+                                else { 
+                                    if (pieceType === 'R' || pieceType === 'Q') return true;
+                                }
+                            }
+                            break; 
+                        }
+                        nr += dr;
+                        nc += dc;
+                    }
+                }
+
+                const pawnDir = kingColor === 'w' ? -1 : 1;
+                const pawnAttacks = [[kRow + pawnDir, kCol - 1], [kRow + pawnDir, kCol + 1]];
+                for (const [nr, nc] of pawnAttacks) {
+                    if (isInBounds(nr, nc) && board[nr][nc] === opponentColor + 'P') {
+                        return true;
+                    }
+                }
+
+                const kingMoves = [
+                    [-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]
+                ];
+                for (const [dr, dc] of kingMoves) {
+                    const nr = kRow + dr;
+                    const nc = kCol + dc;
+                    if (isInBounds(nr, nc) && board[nr][nc] === opponentColor + 'K') {
+                        return true;
+                    }
+                }
+
+                return false; 
+            }
+
+            function getValidMoves(piece, row, col, board) {
+                const pseudoMoves = []; 
+                const color = piece[0];
+                const type = piece[1];
+                
+                const opponentColor = color === 'w' ? 'b' : 'w';
+                const opponentWall = getWallSquares(board, opponentColor);
+
+                switch (type) {
+                    case 'P': pseudoMoves.push(...getPawnMoves(row, col, color, board)); break;
+                    case 'N': pseudoMoves.push(...getKnightMoves(row, col, color, board)); break;
+                    case 'B': pseudoMoves.push(...getSlidingMoves(row, col, color, board, [[-1, -1], [-1, 1], [1, -1], [1, 1]], opponentWall)); break;
+                    case 'R': pseudoMoves.push(...getSlidingMoves(row, col, color, board, [[-1, 0], [1, 0], [0, -1], [0, 1]], opponentWall)); break;
+                    case 'Q': pseudoMoves.push(...getSlidingMoves(row, col, color, board, [[-1, -1], [-1, 1], [1, -1], [1, 1], [-1, 0], [1, 0], [0, -1], [0, 1]], opponentWall)); break;
+                    case 'K': pseudoMoves.push(...getKingMoves(row, col, color, board)); break;
+                }
+                
+                const legalMoves = [];
+                for (const move of pseudoMoves) {
+                    const [toR, toC] = move;
+                    
+                    if (opponentWall.has(`${toR},${toC}`)) {
+                        continue;
+                    }
+
+                    const tempBoard = JSON.parse(JSON.stringify(board));
+                    tempBoard[toR][toC] = piece;
+                    tempBoard[row][col] = null;
+                    
+                    if (!isKingInCheck(tempBoard, color)) {
+                        legalMoves.push(move);
+                    }
+                }
+                
+                return legalMoves;
+            }
+            
+            function getPawnMoves(r, c, color, board) {
+                const moves = [];
+                const dir = color === 'w' ? -1 : 1;
+                const startRow = color === 'w' ? 6 : 1;
+                
+                const r1 = r + dir;
+                if (isInBounds(r1, c) && !board[r1][c]) {
+                    moves.push([r1, c]);
+                    const r2 = r + (dir * 2);
+                    if (r === startRow && isInBounds(r2, c) && !board[r2][c]) {
+                        moves.push([r2, c]);
+                    }
+                }
+                
+                const captureMoves = [[r1, c - 1], [r1, c + 1]];
+                for (const [nr, nc] of captureMoves) {
+                    if (isInBounds(nr, nc) && board[nr][nc] && board[nr][nc][0] !== color) {
+                        moves.push([nr, nc]);
+                    }
+                }
+
+                const sideMoves = [[r, c - 1], [r, c + 1]];
+                for (const [nr, nc] of sideMoves) {
+                    if (isInBounds(nr, nc) && !board[nr][nc]) { 
+                        moves.push([nr, nc]);
+                    }
+                }
+
+                return moves;
+            }
+
+            function getKnightMoves(r, c, color, board) {
+                const moves = [];
+                const knightMoves = [
+                    [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+                    [1, -2], [1, 2], [2, -1], [2, 1]
+                ];
+                for (const [dr, dc] of knightMoves) {
+                    const nr = r + dr;
+                    const nc = c + dc;
+                    if (isInBounds(nr, nc)) {
+                        const target = board[nr][nc];
+                        if (!target || target[0] !== color) {
+                            moves.push([nr, nc]);
+                        }
+                    }
+                }
+                return moves;
+            }
+            
+            function getKingMoves(r, c, color, board) {
+                 const moves = [];
+                 const kingMoves = [
+                    [-1, -1], [-1, 0], [-1, 1],
+                    [0, -1],           [0, 1],
+                    [1, -1], [1, 0], [1, 1]
+                 ];
+                for (const [dr, dc] of kingMoves) {
+                    const nr = r + dr;
+                    const nc = c + dc;
+                    if (isInBounds(nr, nc)) {
+                        const target = board[nr][nc];
+                        if (!target || target[0] !== color) {
+                            moves.push([nr, nc]);
+                        }
+                    }
+                }
+                return moves;
+            }
+
+            function getSlidingMoves(r, c, color, board, directions, wallSquares) {
+                const moves = [];
+                for (const [dr, dc] of directions) {
+                    let nr = r + dr;
+                    let nc = c + dc;
+                    while (isInBounds(nr, nc)) {
+                        
+                        if (wallSquares.has(`${nr},${nc}`)) {
+                            break;
+                        }
+
+                        const target = board[nr][nc];
+                        if (!target) {
+                            moves.push([nr, nc]);
+                        } else if (target[0] !== color) {
+                            moves.push([nr, nc]);
+                            break;
+                        } else {
+                            break;
+                        }
+                        nr += dr;
+                        nc += dc;
+                    }
+                }
+                return moves;
+            }
+
+            // --- 6. Логика ИИ (Без изменений) ---
+            
+            function triggerAIMove() {
+                isThinking = true;
+                updateStatus('Ход: Черные (Думают...)');
+                setTimeout(runAI, 100); 
+            }
+
+            function runAI() {
+                const bestMove = findBestMove(boardState, 'b');
+                if (bestMove) {
+                    movePiece(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
+                    pawnPromotionCheck(bestMove.toRow, bestMove.toCol);
+                }
+                switchPlayer();
+                resetSelection();
+                renderBoard();
+                isThinking = false;
+            }
+
+            function findBestMove(currentBoard, playerColor) {
+                let bestScore = -Infinity;
+                let bestMove = null;
+                const possibleMoves = getAllPossibleMoves(currentBoard, playerColor);
+                possibleMoves.sort(() => Math.random() - 0.5); 
+                
+                for (const move of possibleMoves) {
+                    const tempBoard = simulateMove(currentBoard, move);
+                    const score = minimax(tempBoard, AI_DEPTH - 1, -Infinity, +Infinity, false); 
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = move;
+                    }
+                }
+                return bestMove;
+            }
+
+            function minimax(board, depth, alpha, beta, isMaximizingPlayer) {
+                if (depth === 0) {
+                    return evaluateBoard(board);
+                }
+                
+                if (isMaximizingPlayer) { // Ход ИИ (Черные)
+                    let bestScore = -Infinity;
+                    const moves = getAllPossibleMoves(board, 'b');
+                    if (moves.length === 0) return isKingInCheck(board, 'b') ? -1000000 : 0; 
+
+                    for (const move of moves) {
+                        const newBoard = simulateMove(board, move);
+                        const score = minimax(newBoard, depth - 1, alpha, beta, false);
+                        bestScore = Math.max(bestScore, score);
+                        alpha = Math.max(alpha, bestScore);
+                        if (beta <= alpha) break; 
+                    }
+                    return bestScore;
+                } else { // Ход Игрока (Белые)
+                    let bestScore = +Infinity;
+                    const moves = getAllPossibleMoves(board, 'w');
+                    if (moves.length === 0) return isKingInCheck(board, 'w') ? 1000000 : 0; 
+
+                    for (const move of moves) {
+                        const newBoard = simulateMove(board, move);
+                        const score = minimax(newBoard, depth - 1, alpha, beta, true);
+                        bestScore = Math.min(bestScore, score);
+                        beta = Math.min(beta, bestScore);
+                        if (beta <= alpha) break; 
+                    }
+                    return bestScore;
+                }
+            }
+
+            function evaluateBoard(board) {
+                let totalScore = 0;
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = board[r][c];
+                        if (piece) {
+                            const value = PIECE_VALUES[piece[1]];
+                            totalScore += (piece[0] === 'b' ? value : -value);
+                        }
+                    }
+                }
+                return totalScore;
+            }
+
+            function getAllPossibleMoves(board, color) {
+                const allMoves = [];
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = board[r][c];
+                        if (piece && piece[0] === color) {
+                            const validMoves = getValidMoves(piece, r, c, board); 
+                            for (const [toR, toC] of validMoves) {
+                                allMoves.push({ piece, fromRow: r, fromCol: c, toRow: toR, toCol: toC });
+                            }
+                        }
+                    }
+                }
+                return allMoves;
+            }
+
+            function simulateMove(board, move) {
+                const newBoard = JSON.parse(JSON.stringify(board)); 
+                const piece = newBoard[move.fromRow][move.fromCol];
+                newBoard[move.toRow][move.toCol] = piece;
+                newBoard[move.fromRow][move.fromCol] = null;
+                
+                if (piece === 'bP' && move.toRow === 7) newBoard[move.toRow][move.toCol] = 'bQ';
+                if (piece === 'wP' && move.toRow === 0) newBoard[move.toRow][move.toCol] = 'wQ';
+                return newBoard;
+            }
+
+            // --- 7. Запуск игры ---
+            resetButton.addEventListener('click', () => {
+                if (isThinking) return;
+                initializeApp();
+            });
+            initializeApp();
+        });
+    </script>
+
+</body>
+</html>
+
