@@ -6,7 +6,7 @@ const CACHE_NAME = 'chess-v1';
 // 'chess_game.html' - сам файл игры
 const FILES_TO_CACHE = [
   '.',
-  'chess_game.html'
+  'index.html'
 ];
 
 // 1. Событие 'install' (установка)
