@@ -9,7 +9,7 @@
 "orientation": "portrait",
 "icons": [
 {
-"src": "https://www.google.com/search?q=https://placehold.co/192x192/B58863/FFFFFF%3Ftext%3D♚",
+"src": "https://placehold.co/192x192/B58863/FFFFFF?text=♚",
 "type": "image/png",
 "sizes": "192x192",
 "purpose": "any maskable"
