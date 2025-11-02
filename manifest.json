@@ -1,0 +1,24 @@
+{
+"name": "Шахматы (Свой Вариант)",
+"short_name": "Шахматы",
+"description": "Пользовательская игра в шахматы с ИИ и новыми правилами.",
+"start_url": ".",
+"display": "standalone",
+"background_color": "#312e2b",
+"theme_color": "#5a4a3a",
+"orientation": "portrait",
+"icons": [
+{
+"src": "https://www.google.com/search?q=https://placehold.co/192x192/B58863/FFFFFF%3Ftext%3D♚",
+"type": "image/png",
+"sizes": "192x192",
+"purpose": "any maskable"
+},
+{
+"src": "https://www.google.com/search?q=https://placehold.co/512x512/B58863/FFFFFF%3Ftext%3D♚",
+"type": "image/png",
+"sizes": "512x512",
+"purpose": "any maskable"
+}
+]
+}
